@@ -14,6 +14,8 @@ from __future__ import annotations
 import argparse
 import logging
 import logging.handlers
+import os
+import signal
 import sys
 from pathlib import Path
 
@@ -101,6 +103,29 @@ def main(argv: list[str] | None = None) -> int:
     app.setQuitOnLastWindowClosed(False)  # le tray pilote la fermeture
     theme.apply_theme(app)
     app.setWindowIcon(theme.make_app_icon())
+
+    # Ctrl+C doit arrêter Qt : PySide6 avale les exceptions levées dans les
+    # slots (imprimées via sys.excepthook puis ignorées) — sans ces hooks,
+    # KeyboardInterrupt n'atteint jamais except KeyboardInterrupt ci-dessous.
+    stopping = False
+
+    def _request_stop() -> None:
+        nonlocal stopping
+        if stopping:
+            os._exit(130)  # second Ctrl+C : sortie forcée
+        stopping = True
+        logger.info("Interruption clavier — arrêt demandé.")
+        app.quit()
+
+    signal.signal(signal.SIGINT, lambda *_: _request_stop())
+
+    def _excepthook(exc_type, exc, tb) -> None:
+        if issubclass(exc_type, KeyboardInterrupt):
+            _request_stop()
+            return
+        sys.__excepthook__(exc_type, exc, tb)
+
+    sys.excepthook = _excepthook
 
     bridge = GuiBridge(ctx.bus)
     window = MainWindow(ctx, bridge)

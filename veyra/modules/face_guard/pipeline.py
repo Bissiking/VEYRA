@@ -56,6 +56,7 @@ class FacePipeline:
     def __init__(self, paths: ModelPaths) -> None:
         self._paths = paths
         self._detector = None
+        self._aligner = None
         self._session = None
         self._input_name = ""
         self._error = ""
@@ -64,7 +65,8 @@ class FacePipeline:
 
     @property
     def loaded(self) -> bool:
-        return self._detector is not None and self._session is not None
+        return (self._detector is not None and self._aligner is not None
+                and self._session is not None)
 
     @property
     def error(self) -> str:
@@ -88,6 +90,8 @@ class FacePipeline:
                 nms_threshold=0.3,
                 top_k=5000,
             )
+            # alignCrop est une méthode d'instance depuis OpenCV 4.10+.
+            self._aligner = cv2.FaceRecognizerSF.create(str(self._paths.sface), "")
             so = ort.SessionOptions()
             so.log_severity_level = 3  # réduit le bruit des warnings ONNX
             self._session = ort.InferenceSession(
@@ -102,6 +106,7 @@ class FacePipeline:
             self._error = f"Échec de chargement des modèles : {exc}"
             logger.exception(self._error)
             self._detector = None
+            self._aligner = None
             self._session = None
             return False
 
@@ -151,9 +156,7 @@ class FacePipeline:
     def _embed(self, frame: np.ndarray, det: np.ndarray) -> np.ndarray | None:
         """Empreinte SFace 128-D, normalisée L2 (sortie ONNX Runtime)."""
         try:
-            import cv2
-
-            aligned = cv2.FaceRecognizerSF.alignCrop(frame, det)
+            aligned = self._aligner.alignCrop(frame, det)
             blob = aligned.astype(np.float32)
             blob = (blob - 127.5) / 127.5          # normalisation standard SFace
             blob = blob.transpose(2, 0, 1)[None]    # NCHW
