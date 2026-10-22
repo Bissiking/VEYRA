@@ -1,0 +1,34 @@
+# VEYRA — ignorés par git
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Tests / couverture
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Modèles biométriques (téléchargés localement, jamais versionnés)
+models/*.onnx
+
+# Données locales (SQLite, logs)
+*.db
+*.db-wal
+*.db-shm
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Éditeurs
+.idea/
+.vscode/
+*.swp
