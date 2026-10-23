@@ -32,7 +32,7 @@ class MacosAdapter(PlatformAdapter):
 
     def capabilities(self) -> PlatformCapabilities:
         notes: dict[str, str] = {}
-        if not sys.platform == "darwin":
+        if sys.platform != "darwin":
             notes["session_lock"] = (
                 "Adaptateur macOS chargé hors de macOS : verrouillage indisponible."
             )
@@ -57,7 +57,7 @@ class MacosAdapter(PlatformAdapter):
         try:
             result = subprocess.run(
                 ["osascript", "-e", _LOCK_APPLESCRIPT],
-                capture_output=True, text=True, timeout=10,
+                check=False, capture_output=True, text=True, timeout=10,
             )
         except (OSError, subprocess.TimeoutExpired):
             logger.exception("Échec de l'exécution d'osascript.")

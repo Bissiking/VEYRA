@@ -5,6 +5,67 @@ Toutes les modifications significatives. Format inspiré de
 [CalVer simplifié](https://calver.org/) non applicable ici : sémantique
 `MAJEUR.MINEUR.PATCH`.
 
+## [0.2.0] — 2026-10-23
+
+Version V0.2 — anti-spoofing, calibration, multiplateforme (Windows/Linux).
+
+### Ajouté
+
+#### Anti-spoofing
+- `veyra/modules/face_guard/liveness.py` : `LivenessTracker` (fenêtre glissante,
+  détection clignement open→closed→open, score de texture locale via
+  `eye_openness()` / `texture_score()`), `LivenessSnapshot` figé.
+- `DetectedFace.landmarks` (5 points) et `.texture` extraits par le pipeline
+  et fournis au tracker.
+- Dégradation `TRUSTED`→`UNKNOWN` si l'anti-spoofing déclenche ; jamais de
+  verrouillage immédiat (heuristique, un seul signal insuffisant).
+- Nouveaux champs `SecurityPolicy` : `anti_spoofing_enabled`, `liveness_window_s`,
+  `liveness_min_blinks`, `liveness_min_openness`, `liveness_min_texture`.
+
+#### Calibration
+- `veyra/modules/face_guard/calibration.py` : `far_frr_curve`, `equal_error_point`,
+  `calibrate`, `merge_samples` — collecte locale pendant l'enrôlement,
+  aucun départ de données biométriques.
+- GUI Réglages : start/stop calibration, courbe FAR/FRR (QPainter), application
+  du seuil EER.
+
+#### Plateformes
+- `WindowsAdapter.lock_session()` : `ctypes.windll.user32.LockWorkStation()`,
+  capabilities `session_lock=True`, `secure_key_storage=True`.
+- `LinuxAdapter.lock_session()` : `loginctl lock-session` (subprocess,
+  `check=False`), capabilities sondées via `shutil.which`.
+- `WindowsDpapiStorage` : `CryptProtectData` / `CryptUnprotectData`, blob
+  `%APPDATA%/VEYRA/profile_kek.dpapi`, refus explicite si DPAPI échoue.
+- `LinuxSecretServiceStorage` : `secret-tool` (lookup/store/clear), KEK
+  32 octets, refus si `secret-tool` absent.
+- `veyra/platforms/autostart.py` : démarrage au login — LaunchAgent macOS,
+  HKCU Run Windows, `.desktop` autostart Linux ; case à cocher dans les
+  Réglages, état détecté et basculable.
+
+#### Interface
+- Réglages : groupe « Anti-spoofing » (activation + seuils), groupe
+  « Calibration des seuils » (lancement, courbe, application EER), case
+  « Démarrage au login ».
+- Modules : capacités plateforme affichées dynamiquement (Windows/Linux
+  ne montrent plus « NON (V0.1) »).
+
+### Corrigé
+
+- `app.quit()` explicite à la fermeture de la fenêtre principale (fermeture
+  propre de l'événementiel Qt).
+- Gestionnaire SIGINT ajouté pour arrêt propre sur Ctrl+C.
+- `alignCrop` aligné sur l'instance OpenCV 4.14 (signature `cv2`).
+- `LinuxSecretServiceStorage` : ne supprime plus les `\n` internes de la KEK
+  (seulement le `\n` final éventuel).
+
+### Tests
+
+- 56 nouveaux tests : plateformes (verrouillage, coffres, autostart),
+  liveness (blink, texture, dégradation), calibration (courbe, EER, merge),
+  policy (persistance des nouveaux champs), intégration face_guard
+  (dégradation spoof + calibration avec pipeline mocké).
+- Total : **135 tests**, tous verts.
+
 ## [0.1.0] — 2026-10-22
 
 Première version fonctionnelle (V0.1) — plateforme de sécurité locale.

@@ -1,4 +1,4 @@
-# SIMULATION — VEYRA V0.1
+# SIMULATION — VEYRA V0.2
 
 Coupe-circuit de sécurité, modes de fonctionnement et scénarios de test.
 
@@ -6,7 +6,7 @@ Coupe-circuit de sécurité, modes de fonctionnement et scénarios de test.
 
 Une plateforme de verrouillage de session peut causer des déni de service
 auto-infligés (verrouillage à tort, verrouillage pendant une démonstration).
-La V0.1 démarre donc **toujours** en SIMULATION : toutes les détections,
+La V0.2 démarre donc **toujours** en SIMULATION : toutes les détections,
 décisions et journalisations fonctionnent, mais **aucune action réelle n'est
 exécutée**. Le passage en mode réel est un choix conscient et confirmé.
 
@@ -63,7 +63,7 @@ Notification de tray à chaque `lock_outcome` : « Verrouillage simulé : … »
 
 ## Scénarios de test
 
-### Automatisés (79 tests : `python -m pytest tests/`)
+### Automatisés (135 tests : `python -m pytest tests/`)
 
 | Fichier | Couverture |
 |---|---|
@@ -117,6 +117,7 @@ Sortie attendue : `mode: SIMULATION | simulé: True | exécuté: False`
   peuvent pas l'ignorer car ils n'ont aucun accès à la plateforme.
 - `ActionExecutor` est le **seul** appelant de `platform.lock_session()`
   (vérifiable par recherche de `lock_session` dans le dépôt).
-- En V0.1, les adaptateurs Windows/Linux **lèvent `NotImplementedError`** :
-  même en mode PROTECTION, un verrouillage impossible échoue proprement et est
-  journalisé (jamais de faux « exécuté »).
+- En mode PROTECTION, la capacité de verrouillage dépend de la plateforme :
+  si l'adaptateur ne supporte pas le verrouillage (capacité `False` ou
+  outil système absent), l'échec est proprement journalisé — jamais de faux
+  « exécuté ».

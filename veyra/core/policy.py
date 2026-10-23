@@ -45,7 +45,7 @@ class ProtectionMode(str, Enum):
 
 @dataclass
 class SecurityPolicy:
-    """Paramètres du moteur de décision (valeurs par défaut = V0.1).
+    """Paramètres du moteur de décision (valeurs par défaut = V0.2).
 
     Toute valeur est persistée via ``storage.config`` et modifiable dans
     la page Settings de la GUI.
@@ -68,6 +68,13 @@ class SecurityPolicy:
     min_face_size_px: int = 80              # visage trop petit -> UNDETERMINED
     min_face_brightness: float = 40.0       # luminosité moyenne du ROI sous ce seuil -> mauvais éclairage
 
+    # Anti-spoofing basique (V0.2 — heuristique, voir docs/SECURITY.md)
+    anti_spoofing_enabled: bool = True
+    liveness_window_s: float = 8.0          # fenêtre de suivi du clignement
+    liveness_min_blinks: int = 1            # clignements minimum sur la fenêtre
+    liveness_min_openness: float = 0.12     # contraste d'œil sous ce seuil -> œil fermé
+    liveness_min_texture: float = 40.0      # texture moyenne sous ce seuil -> photo lisse
+
     # Consentement / enrôlement
     enrollment_samples: int = 8             # échantillons multi-angles requis
 
@@ -84,11 +91,16 @@ class SecurityPolicy:
             "recognition_margin": self.recognition_margin,
             "min_face_size_px": self.min_face_size_px,
             "min_face_brightness": self.min_face_brightness,
+            "anti_spoofing_enabled": self.anti_spoofing_enabled,
+            "liveness_window_s": self.liveness_window_s,
+            "liveness_min_blinks": self.liveness_min_blinks,
+            "liveness_min_openness": self.liveness_min_openness,
+            "liveness_min_texture": self.liveness_min_texture,
             "enrollment_samples": self.enrollment_samples,
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, object]) -> "SecurityPolicy":
+    def from_dict(cls, data: dict[str, object]) -> SecurityPolicy:
         """Construit une politique à partir d'un dict persisté (clés inconnues ignorées)."""
         policy = cls()
         for key, default in cls().to_dict().items():
@@ -96,7 +108,7 @@ class SecurityPolicy:
                 continue
             value = data[key]
             try:
-                setattr(policy, key, type(default)(value))  # noqa: SLF001
+                setattr(policy, key, type(default)(value))
             except (TypeError, ValueError):
                 continue
         return policy

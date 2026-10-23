@@ -7,7 +7,7 @@ Légende : **✅ implémenté (testé)** · **⚠️ expérimental** · **📋 p
 
 ---
 
-## V0.1 — version actuelle
+## V0.1 — historique
 
 ### ✅ Implémenté et testé (79 tests)
 
@@ -47,16 +47,37 @@ Légende : **✅ implémenté (testé)** · **⚠️ expérimental** · **📋 p
 
 ---
 
-## V0.2 — priorité haute (prévisionnel)
+## V0.2 — version actuelle
 
-| Fonctionnalité | État | Notes |
-|---|---|---|
-| Anti-spoofing basique (blink/texture) | 📋 | premier jalon pour limiter les photos |
-| Calibration des seuils depuis l'UI (courbe FAR/FRR locale) | 📋 | basée sur les échantillons d'enrôlement |
-| Verrouillage Windows (`LockWorkStation`) | 📋 | adaptateur existant à compléter |
-| Verrouillage Linux (`loginctl lock-session`) | 📋 | idem |
-| Coffre clés Windows (DPAPI) / Linux (Secret Service) | 📋 | débloque l'enrôlement hors macOS |
-| Démarrage au login (option utilisateur) | 📋 | agent utilisateur, pas de daemon root |
+### ✅ Implémenté et testé (135 tests)
+
+| Fonctionnalité | Détail |
+|---|---|
+| Anti-spoofing basique (blink/texture) | `LivenessTracker` : détection clignement (open→closed→open) + score de texture locale ; dégradation TRUSTED→UNKNOWN si suspect ; heuristiques documentés, pas de faux positifs sur un seul signal |
+| Calibration des seuils (courbe FAR/FRR) | Module `calibration.py` : `far_frr_curve`, EER, échantillons collectés localement pendant l'enrôlement — **aucune image ni empreinte ne quitte l'appareil** |
+| Verrouillage Windows | `LockWorkStation` via ctypes, capability `session_lock=True` |
+| Verrouillage Linux | `loginctl lock-session` (subprocess), capabilities sondées (`loginctl` / `secret-tool`) |
+| Coffre clés Windows | DPAPI utilisateur (`CryptProtectData` / `CryptUnprotectData`), blob `%APPDATA%/VEYRA/profile_kek.dpapi` |
+| Coffre clés Linux | Secret Service via `secret-tool` (KEK 32 octets), refus explicite si absent |
+| Démarrage au login | macOS LaunchAgent, Windows HKCU Run, Linux `.desktop` autostart — option utilisateur dans les Réglages |
+
+### ⚠️ Expérimental / limité (comportement réel connu)
+
+| Élément | Limite |
+|---|---|
+| Verrouillage macOS | nécessite l'autorisation Accessibilité ; échec journalisé si refusé |
+| Verrouillage Linux | nécessite `loginctl` ; sinon capability `False` affichée |
+| Anti-spoofing | heuristiques (blink + texture) — ne détecte pas les deepfakes ni les vidéos |
+| Calibration | basée sur les échantillons d'enrôlement (jeu limité) ; à affiner en usage réel |
+| Pipeline hors macOS | multiplateforme implémentée, validée par tests unitaires (pas de test hardware Windows/Linux) |
+
+### 📋 Limites assumées
+
+- **Anti-spoofing** : blink + texture seuls ; pas de profondeur, pas de détection deepfake (voir `SECURITY.md`).
+- **Un seul profil utilisateur** autorisé (schéma déjà multi-profils).
+- **Aucune détection réseau / antivirus** (hors périmètre, volontairement).
+
+---
 
 ## V0.3 — priorité moyenne (prévisionnel)
 

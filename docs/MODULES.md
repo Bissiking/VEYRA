@@ -1,4 +1,4 @@
-# MODULES — VEYRA V0.1
+# MODULES — VEYRA V0.2
 
 Fonctionnement des modules, interfaces communes et guide de création d'un
 nouveau module.
@@ -40,24 +40,31 @@ class IVeyraModule(ABC):
 
 ---
 
-## Modules implémentés en V0.1
+## Modules implémentés
 
 ### `face_guard` — Présence faciale (`veyra/modules/face_guard/`)
 
 - **Rôle** : détection (YuNet), empreinte (SFace via ONNX Runtime), enrôlement
-  multi-angles, comparaison au profil autorisé.
+  multi-angles, comparaison au profil autorisé, anti-spoofing basique.
 - **Sous-composants** :
   - `camera.py` (`CameraWorker`) : thread de capture, dernière frame en mémoire,
     publication `CAMERA_STATUS`, réessai avec backoff (2 s → 15 s).
   - `pipeline.py` (`FacePipeline`) : détection → alignement SFace → embedding
-    128-D normalisé → classification (`TRUSTED` / `UNKNOWN` / `UNDETERMINED` / `NO_FACE`).
+    128-D normalisé → classification (`TRUSTED` / `UNKNOWN` / `UNDETERMINED` /
+    `NO_FACE`), extraction landmarks + texture.
+  - `liveness.py` (`LivenessTracker`) : détection clignement + score texture,
+    dégradation `TRUSTED`→`UNKNOWN` si suspect.
+  - `calibration.py` : courbe FAR/FRR, seuil EER à partir des échantillons
+    d'enrôlement.
   - `enrollment.py` (`EnrollmentSession`, `ProfileRepository`) : récolte d'échantillons
     avec contrôle de diversité d'angles, moyenne normalisée, chiffrement, SQLite.
   - `module.py` (`FaceGuardModule`) : boucle d'analyse à cadence variable selon
-    le mode du moteur (`ANALYSIS_REQUEST` / `ENGINE_STATE`).
+    le mode du moteur (`ANALYSIS_REQUEST` / `ENGINE_STATE`), échantillonnage
+    liveness, collecte calibration.
 - **Entrées bus** : `ENGINE_STATE`, `ANALYSIS_REQUEST`.
 - **Sorties bus** : `CAMERA_STATUS`, `FACE_OBSERVATION`, `ENROLLMENT_PROGRESS`, `MODULE_STATUS`.
-- **Métriques** : `analyses`, `last_state`, `camera_ok`, `profile_loaded`, `faces_seen`.
+- **Métriques** : `analyses`, `last_state`, `camera_ok`, `profile_loaded`, `faces_seen`,
+  `spoof_suspect`, `blinks`.
 - **État particulier** : si les modèles ONNX sont absents, le module passe en
   `ERROR` avec le message « exécuter `scripts/download_models.py` ». L'aperçu
   caméra reste disponible. **Aucune reconnaissance simulée.**
@@ -71,7 +78,8 @@ class IVeyraModule(ABC):
 - **macOS** : vérifie les autorisations via `AXIsProcessTrusted` et
   `CGPreflightListenEventAccess` ; sans elles, état `DEGRADED` avec le chemin
   d'accord dans les Réglages (aucun contournement).
-- **Plateformes sans support** (Windows/Linux V0.1) : `UNAVAILABLE`, visible en GUI.
+- **Plateformes sans support** : `UNAVAILABLE`, visible en GUI (capacités
+  honnêtes, jamais simulées).
 - **Entrées bus** : —
 - **Sorties bus** : `ACTIVITY_DETECTED`, `MODULE_STATUS`.
 
@@ -86,7 +94,7 @@ class IVeyraModule(ABC):
 
 ---
 
-## Développer un nouveau module (prévisionnel — non implémenté en V0.1)
+## Développer un nouveau module (prévisionnel)
 
 1. Créer `veyra/modules/<nom>/module.py` avec une classe `IVeyraModule`.
 2. Publier ses observations sur le bus (`EventType` à ajouter dans `core/events.py`).
@@ -97,5 +105,5 @@ class IVeyraModule(ABC):
    (implémenté / expérimental / planifié).
 6. Ajouter ses tests dans `tests/`.
 
-> Aucun module supplémentaire n'est prévu en V0.1 (pas d'antivirus, pas de
+> Aucun module supplémentaire n'est prévu en V0.2 (pas d'antivirus, pas de
 > surveillance réseau — voir `docs/ROADMAP.md`).

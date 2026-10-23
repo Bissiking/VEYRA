@@ -5,9 +5,9 @@ Reconnaissance faciale et décision 100 % hors ligne, surveillance d'activité
 sans contenu, verrouillage de session piloté par un moteur adaptatif — avec un
 **coupe-circuit SIMULATION** actif par défaut.
 
-> **Statut : V0.1 — version initiale utilisable et testée.**  
-> Plateforme prioritaire : **macOS**. Windows et Linux : interfaces
-> prévisionnelles, non opérationnelles en V0.1 (voir
+> **Statut : V0.2 — anti-spoofing, calibration, multiplateforme.**  
+> Plateformes supportées : **macOS** (prioritaire), **Windows**, **Linux**
+> (verrouillage + coffre clés ; activité clavier/souris macOS seule — voir
 > [INSTALLATION](docs/INSTALLATION.md#4-note-de-compatibilité)).
 
 ## Principe
@@ -19,17 +19,20 @@ sans contenu, verrouillage de session piloté par un moteur adaptatif — avec u
 - **Transparence** : chaque fonctionnalité est documentée avec son état réel
   (implémenté / expérimental / planifié). Rien n'est simulé silencieusement.
 
-## Fonctionnalités de la V0.1
+## Fonctionnalités (V0.2)
 
 | Domaine | Implémenté |
 |---|---|
-| Présence faciale | détection YuNet, empreinte SFace (ONNX Runtime), enrôlement multi-angles chiffré (Keychain), 4 états, multi-visages, suppression complète du profil |
+| Présence faciale | détection YuNet, empreinte SFace (ONNX Runtime), enrôlement multi-angles chiffré (coffre clés système), 4 états, multi-visages, suppression complète du profil |
+| Anti-spoofing | détection clignement + score texture locale, dégradation TRUSTED→UNKNOWN si suspect (heuristiques, limites documentées) |
+| Calibration | courbe FAR/FRR locale, seuil EER applicable depuis les Réglages — aucune donnée biométrique sortante |
 | Surveillance adaptative | mode léger après 10 s d'inactivité, analyse espacée de 5 s, confirmation d'identité suspecte sur 2 s, analyse prioritaire à la reprise |
 | Décision | inconnu confirmé + activité → verrouillage ; absence sans activité → maintien ; webcam perdue après absence + activité → verrouillage selon politique |
 | Coupe-circuit | SIMULATION par défaut à chaque démarrage, PROTECTION avec confirmation explicite, exécuteur unique, journalisation complète |
-| Activité | clavier/souris **sans enregistrement de contenu** (horodatages seuls) |
+| Plateformes | verrouillage macOS / Windows / Linux ; coffre clés Keychain / DPAPI / Secret Service ; démarrage au login (optionnel) |
+| Activité | clavier/souris **sans enregistrement de contenu** (horodatages seuls, macOS) |
 | Interface | PySide6 sombre, 5 pages (Dashboard, Présence, Modules, Événements, Réglages), icône de tray, fermeture masquante, sortie explicite |
-| Tests | 79 tests (moteur, coupe-circuit, scénarios d'intrusion sans webcam, smoke GUI) |
+| Tests | 135 tests (moteur, coupe-circuit, scénarios d'intrusion sans webcam, liveness, calibration, plateformes, smoke GUI) |
 
 Limites assumées (notamment **anti-usurpation**) : [SECURITY.md](docs/SECURITY.md).
 
@@ -83,11 +86,13 @@ models/       *.onnx locaux (jamais versionnés)
 
 1. Le mode **SIMULATION est toujours actif au démarrage** ; activer la
    PROTECTION demande de saisir `PROTECTION` dans les Réglages.
-2. Les empreintes sont chiffrées **AES-256-GCM**, clé dans le **Keychain macOS**.
+2. Les empreintes sont chiffrées **AES-256-GCM**, clé dans le coffre clés
+   système (Keychain / DPAPI / Secret Service selon la plateforme).
 3. Aucune image brute, aucune touche tapée, aucune trajectoire de souris,
-   aucun contenu d'application n'est conservé.
-4. **Les photos ne sont pas détectées comme usurpation en V0.1** —
-   à lire avant toute mise en mode PROTECTION : [docs/SECURITY.md](docs/SECURITY.md).
+   aucun contenu d'app n'est conservé.
+4. **L'anti-usurpation V0.2 (blink + texture) n'est pas une preuve de vivant
+   robuste** — les limites sont documentées et à lire avant toute mise en
+   mode PROTECTION : [docs/SECURITY.md](docs/SECURITY.md).
 
 ## Licence
 

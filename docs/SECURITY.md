@@ -1,9 +1,9 @@
-# SÉCURITÉ — VEYRA V0.1
+# SÉCURITÉ — VEYRA V0.2
 
 Modèle de sécurité, traitement des données biométriques, limites connues et
 protections en place.
 
-## Modèle de menace (V0.1)
+## Modèle de menace (V0.2)
 
 VEYRA protège contre : **un tiers utilisant la session pendant l'absence de
 l'utilisateur** (présence non autorisée détectée par visage + activité).
@@ -42,13 +42,13 @@ Deux modes, définis dans `veyra/core/safety.py` :
 | Donnée | Où | Protection |
 |---|---|---|
 | Empreinte faciale 128-D (moyenne d'échantillons) | SQLite `profiles.embedding_blob` | chiffrée **AES-256-GCM** (`cryptography`) |
-| Clé de chiffrement (KEK) | **Keychain macOS** (`security`, service `veyra.biometric`) | coffre système |
+| Clé de chiffrement (KEK) | **Keychain macOS** / **DPAPI Windows** / **Secret Service Linux** | coffre système local |
 | Événements / décisions | SQLite `events` | aucune donnée biométrique dedans |
 | Paramètres | SQLite `settings` | — |
 
 - **Aucune image brute n'est conservée** : les frames vivent en mémoire
   (`CameraWorker`) et sont abandonnées après inférence. L'enregistrement
-  d'images n'est **pas implémenté** en V0.1 (paramètre présent mais inactif,
+  d'images n'est **pas implémenté** (paramètre présent mais inactif,
   la GUI l'indique explicitement).
 - **Suppression complète** : `AppContext.delete_biometric_profile()` efface la
   ligne SQLite **et** l'entrée Keychain (`BiometricVault.destroy()`).
@@ -59,40 +59,61 @@ Deux modes, définis dans `veyra/core/safety.py` :
 
 ### Refus explicite plutôt que fallback
 
-- Sans coffre clés fonctionnel (Windows/Linux en V0.1, Keychain refusé),
-  l'enrôlement **échoue avec un message explicite** — aucune empreinte n'est
-  écrite en clair.
-- Si la KEK du Keychain disparaît, le déchiffrement lève `KeyStorageError` et
+- Sur chaque plateforme, si le coffre clés système est indisponible
+  (Keychain refusé, DPAPI échoue, `secret-tool` absent), l'enrôlement
+  **échoue avec un message explicite** — aucune empreinte n'est écrite en clair.
+- Si la KEK disparaît du coffre, le déchiffrement lève `KeyStorageError` et
   le profil est signalé « indéchiffrable » en GUI.
 
-## Limites de l'anti-usurpation (IMPORTANT)
+## Anti-usurpation (V0.2) — ce qui est fait et ce qui ne l'est pas
 
-> **Une photo ou une vidéo présentée à la webcam n'est pas détectée comme telle
-> en V0.1.** Le pipeline ne comporte aucune détection de vivant (blink, texture,
-> profondeur, Infrared). Conséquences :
+### Ce qui est implémenté (V0.2)
+
+- **Détection de clignement** : le tracker observe l'ouverture des yeux
+  (estimation à partir des 5 points YuNet) ; un cycle open→closed→open
+  dans la fenêtre glissante compte comme un clignement.
+- **Score de texture locale** : variance du Laplacien sur le ROI visage,
+  indicateur grossier d'une surface plane (photo) vs peau vivante.
+- **Dégradation, pas de verrouillage** : si les heuristiques déclenchent
+  (`spoof_suspect`), un visage `TRUSTED` est dégradé en `UNKNOWN`. Aucune
+  action agressive n'est prise sur un seul signal (faux positifs maîtrisés).
+
+### Limites résiduelles (IMPORTANT)
+
+> **Un deepfake ou une vidéo de haute qualité peut passer les heuristiques
+> V0.2.** Le blink + la texture ne constituent pas une preuve de vivant
+> robuste :
 >
-> - la présence « TRUSTED » atteste d'une **correspondance d'empreinte**, pas
->   d'une preuve de présence vivante ;
-> - un attaquant en possession d'une photo haute résolution du propriétaire
->   peut potentiellement obtenir un état `TRUSTED` ;
-> - les contrôles actuels (taille minimale du visage, luminosité) réduisent les
->   faux positifs de mauvaise qualité, **pas** les usurpations par photo.
+> - un attaquant qui fait cligneter quelqu'un (ou une vidéo avec clignements)
+>   peut obtenir `TRUSTED` ;
+> - un masque haut de gamme ou un écran haute définition peuvent tromper
+>   le score de texture ;
+> - il n'y a **pas** de détection de profondeur, d'Infrared, ni de modèle
+>   d'anti-spoofing entraîné (SuFu, Silent-Face).
 >
-> Pistes documentées mais **non implémentées** (voir `docs/ROADMAP.md`) :
-> détection de photos (mouvement/parallaxe), challenge-réponse visuel,
-> capteur profondeur, modèles d'anti-spoofing (SuFu, Silent-Face).
+> La calibration locale (courbe FAR/FRR) permet d'ajuster les seuils à
+> l'usage réel, mais ne change pas la nature des signaux utilisés.
+
+Pistes documentées pour une V0.3+ : détection de parallaxe/mouvement,
+challenge-réponse visuel, capteur de profondeur, modèle d'anti-spoofing
+(SuFu, Silent-Face), intégration caméra IR.
 
 Autres limites assumées :
 - **Threshold** : la distance L2 SFace (0,636 par défaut) est une heuristique ;
   la zone grise (`recognition_margin`) renvoie `UNDETERMINED` pour éviter les
   décisions sur des cas limites, mais un réglage trop permissif augmente les
-  faux positifs.
+  faux positifs. La calibration locale (V0.2) permet de l'ajuster.
 - **Permissions macOS** : sans Accessibilité/Surveillance, `activity_guard` est
   `DEGRADED` et le moteur ne reçoit plus d'activité — il bascule en mode léger
   et les règles exigeant une activité ne se déclenchent pas (état visible en
   GUI, jamais masqué). Sans Accessibilité, le verrouillage réel (`osascript`)
   échoue et le `LOCK_OUTCOME` est journalisé comme « échoué ».
-- **Une seule session utilisateur** : le compte macOS verrouillé n'est pas
+- **Permissions Linux** : `loginctl` requis pour le verrouillage ;
+  `secret-tool` requis pour le coffre clés. Absents → capacités `False`
+  affichées, enrôlement refusé explicitement.
+- **Permissions Windows** : DPAPI requis pour le coffre clés. Absent →
+  enrôlement refusé explicitement.
+- **Une seule session utilisateur** : le compte verrouillé n'est pas
   différencié (VEYRA agit sur la session courante).
 
 ## Permissions macOS utilisées

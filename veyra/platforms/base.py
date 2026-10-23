@@ -59,7 +59,7 @@ class PlatformAdapter(ABC):
         """
 
     @abstractmethod
-    def create_activity_stream(self) -> "ActivityStream | None":
+    def create_activity_stream(self) -> ActivityStream | None:
         """Fabrique le flux d'activité (sans contenu de frappe).
 
         Retourne None si la plateforme ne le supporte pas (V0.1).

@@ -5,9 +5,11 @@
 -> comparaison L2 avec l'empreinte de référence (profil autorisé).
 
 États produits : TRUSTED / UNKNOWN / UNDETERMINED / NO_FACE.
-L'anti-usurpation est LIMITÉ en V0.1 (voir docs/SECURITY.md) : une photo
-présentée à la caméra n'est pas détectée comme telle — la présence réelle
-ne peut pas être garantie par ce pipeline seul.
+Anti-spoofing V0.2 : le pipeline expose les landmarks YuNet (5 points) et un
+score de texture ; le suivi temporel (clignement) est assuré par
+``liveness.LivenessTracker`` côté module. La protection reste BASIQUE
+(voir docs/SECURITY.md) : elle limite les photos imprimées simples, pas
+une vidéo projetée ou un masque.
 
 Aucune image n'est conservée au-delà de l'appel ; l'empreinte vit en mémoire
 ou chiffrée via ``BiometricVault``.
@@ -41,6 +43,8 @@ class DetectedFace:
     brightness: float = 0.0
     state: IdentityState = IdentityState.UNDETERMINED
     distance: float | None = None
+    landmarks: np.ndarray | None = None  # (5, 2) pixels : yeux, nez, bouche
+    texture: float = 0.0  # variance du Laplacien du ROI (anti-spoofing V0.2)
 
 
 @dataclass
@@ -144,7 +148,9 @@ class FacePipeline:
                 score=score,
                 w_px=int(bw), h_px=int(bh),
             )
+            face.landmarks = np.asarray(det[4:14], dtype=np.float32).reshape(5, 2)
             face.brightness = self._face_brightness(frame, int(x), int(y), int(bw), int(bh))
+            face.texture = self._face_texture(frame, int(x), int(y), int(bw), int(bh))
             face.embedding = self._embed(frame, det)
             face.state = self._classify(face, reference, policy)
             faces.append(face)
@@ -182,6 +188,19 @@ class FacePipeline:
         roi = frame[y0:y1, x0:x1]
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
         return float(gray.mean())
+
+    @staticmethod
+    def _face_texture(frame: np.ndarray, x: int, y: int, w: int, h: int) -> float:
+        """Variance du Laplacien du ROI — lisse = photo imprimée possible."""
+        import cv2
+
+        h_img, w_img = frame.shape[:2]
+        x0, y0 = max(x, 0), max(y, 0)
+        x1, y1 = min(x + w, w_img), min(y + h, h_img)
+        if x1 <= x0 or y1 <= y0:
+            return 0.0
+        gray = cv2.cvtColor(frame[y0:y1, x0:x1], cv2.COLOR_BGR2GRAY)
+        return float(cv2.Laplacian(gray, cv2.CV_64F).var())
 
     def _classify(self, face: DetectedFace, reference: np.ndarray | None,
                   policy: SecurityPolicy) -> IdentityState:

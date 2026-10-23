@@ -1,4 +1,4 @@
-# CONFIGURATION — VEYRA V0.1
+# CONFIGURATION — VEYRA V0.2
 
 Paramètres, valeurs par défaut et lieux de stockage.
 
@@ -11,7 +11,9 @@ Paramètres, valeurs par défaut et lieux de stockage.
 - **Journaux** : `~/Library/Application Support/VEYRA/logs/veyra.log`
   (rotation 2 Mo × 3).
 - **Modèles ONNX** : `<racine du dépôt>/models/` ou `$VEYRA_MODELS_DIR`.
-- **Clés** : Keychain macOS (service `veyra.biometric`, compte `profile_kek`).
+- **Clés** : coffre système local — Keychain macOS (service `veyra.biometric`),
+  DPAPI Windows (`%APPDATA%/VEYRA/profile_kek.dpapi`), Secret Service Linux
+  (`secret-tool`).
 
 Toute la configuration est modifiable depuis la page **Réglages** de la GUI ;
 les valeurs sont appliquées en cours d'exécution (`AppContext.apply_policy`)
@@ -33,6 +35,11 @@ et persistées immédiatement.
 | `min_face_size_px` | 80 | px | Visage plus petit → `UNDETERMINED` |
 | `min_face_brightness` | 40 | 0-255 | Luminosité ROI plus faible → `UNDETERMINED` |
 | `enrollment_samples` | 8 | count | Échantillons requis à l'enrôlement |
+| `anti_spoofing_enabled` | `true` | bool | Active la détection clignement + texture |
+| `liveness_window_s` | 8 | s | Fenêtre glissante du tracker de vivant |
+| `liveness_min_blinks` | 1 | count | Clignements minimaux dans la fenêtre |
+| `liveness_min_openness` | 0,12 | ratio | Seuil ouverture yeux pour « fermé » |
+| `liveness_min_texture` | 40 | score | Score de texture minimal (anti-photo) |
 
 Plages acceptées par la GUI : seuils ×0,5–300 s ; `recognition_threshold`
 0,1–1,5 ; index caméra 0–9.

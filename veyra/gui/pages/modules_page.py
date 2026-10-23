@@ -4,8 +4,15 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
+)
 
 from veyra.gui.widgets import PageHeader, StateBadge
 
@@ -120,14 +127,14 @@ class ModulesPage(QWidget):
         caps = ctx.platform.capabilities()
         note = QLabel(
             f"Plateforme : {ctx.platform.display_name} — "
-            f"verrouillage : {'oui' if caps.session_lock else 'NON (V0.1)'}, "
-            f"activité : {'oui' if caps.activity_monitoring else 'NON (V0.1)'}, "
-            f"coffre clés : {'oui' if caps.secure_key_storage else 'NON (V0.1)'}."
+            f"verrouillage : {'oui' if caps.session_lock else 'NON'}, "
+            f"activité : {'oui' if caps.activity_monitoring else 'NON'}, "
+            f"coffre clés : {'oui' if caps.secure_key_storage else 'NON'}."
         )
         note.setObjectName("mutedLabel")
         note.setWordWrap(True)
         self._layout.addWidget(note)
-        for key, text in caps.notes.items():
+        for text in caps.notes.values():
             label = QLabel(f"• {text}")
             label.setObjectName("mutedLabel")
             label.setWordWrap(True)

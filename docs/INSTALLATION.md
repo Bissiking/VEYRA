@@ -1,6 +1,6 @@
-# INSTALLATION — VEYRA V0.1
+# INSTALLATION — VEYRA V0.2
 
-## 1. macOS (plateforme prioritaire — V0.1)
+## 1. macOS (plateforme prioritaire)
 
 ### Prérequis
 
@@ -57,7 +57,7 @@ python -m veyra
 ### Vérification de l'installation
 
 ```bash
-# Tests unitaires (79 tests, aucune caméra requise)
+# Tests unitaires (135 tests, aucune caméra requise)
 QT_QPA_PLATFORM=offscreen python -m pytest tests/ -q
 
 # Version
@@ -84,18 +84,9 @@ security delete-generic-password -s veyra.biometric -a profile_kek  # clé biom�
 | `pynput` plante au lancement | sandbox/tcc | lancer hors sandbox ; vérifier les autorisations |
 | Base SQLite verrouillée | instance VEYRA déjà ouverte | vérifier le tray, « Quitter complètement » |
 
-## 2. Windows (prévisionnel — NON OPÉRATIONNEL en V0.1)
+## 2. Windows
 
-L'adaptateur `veyra/platforms/windows.py` existe (interfaces communes), mais
-**toutes les fonctions plateforme sont désactivées** et affichées comme telles
-dans la GUI :
-
-- verrouillage : non implémenté (`NotImplementedError` propre) ;
-- flux d'activité : non implémenté ;
-- coffre clés : non implémenté → **enrôlement biométrique refusé** (jamais de
-  stockage en clair).
-
-Install possible pour développement :
+Install :
 
 ```powershell
 py -3.12 -m venv .venv
@@ -105,14 +96,18 @@ python scripts/download_models.py
 python -m veyra
 ```
 
-La GUI démarrera avec la mention « Windows (prévisionnel) » et les capacités
-`False`. Aucune fonction n'est simulée.
+Capacités Windows (V0.2) :
 
-## 3. Linux (prévisionnel — NON OPÉRATIONNEL en V0.1)
+- **Verrouillage** : `LockWorkStation` (fonction native, pas de permission
+  requise).
+- **Coffre clés** : DPAPI utilisateur (`CryptProtectData`) — enrôlement
+  biométrique disponible.
+- **Activité clavier/souris** : non implémentée (`UNAVAILABLE`, visible en GUI).
 
-Même principe que Windows : adaptateur `veyra/platforms/linux.py` présent,
-capacités `False` en GUI, enrôlement refusé (pas de Secret Service branché),
-verrouillage non implémenté.
+> **Non validé sur matériel Windows** : les capacités sont implémentées et
+> testées par tests unitaires, mais pas expérimentées sur un PC réel.
+
+## 3. Linux
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
@@ -121,15 +116,32 @@ python scripts/download_models.py
 python -m veyra
 ```
 
+Prérequis optionnels :
+
+- `loginctl` (systemd) : requis pour le verrouillage réel.
+- `secret-tool` (libsecret) : requis pour le coffre clés (enrôlement).
+  Absents → capacités `False` affichées, enrôlement refusé explicitement.
+
+Capacités Linux (V0.2) :
+
+- **Verrouillage** : `loginctl lock-session` (si présent).
+- **Coffre clés** : Secret Service via `secret-tool` (si présent).
+- **Activité clavier/souris** : non implémentée (`UNAVAILABLE`, visible en GUI).
+
+> **Non validé sur matériel Linux** : idem Windows — implémenté et testé
+> unitairement, pas expérimenté sur un poste réel.
+
 ## 4. Note de compatibilité
 
 | Fonction | macOS | Windows | Linux |
 |---|---|---|---|
 | GUI PySide6 | ✅ | ⚠️ non testée | ⚠️ non testée |
 | Détection/reconnaissance faciale | ✅ | ✅ théorique* | ✅ théorique* |
-| Enrôlement (coffre clés) | ✅ Keychain | ❌ V0.1 | ❌ V0.1 |
-| Activité clavier/souris | ✅ (permissions) | ❌ V0.1 | ❌ V0.1 |
-| Verrouillage réel | ✅ (permission) | ❌ V0.1 | ❌ V0.1 |
+| Enrôlement (coffre clés) | ✅ Keychain | ✅ DPAPI | ✅ Secret Service† |
+| Activité clavier/souris | ✅ (permissions) | ❌ non implémenté | ❌ non implémenté |
+| Verrouillage réel | ✅ (permission) | ✅ LockWorkStation | ✅ loginctl† |
 
 \* le pipeline OpenCV/ONNX Runtime est multiplateforme mais n'a été validé
 expérimentalement que sur macOS.
+† nécessite l'outil système correspondant ; sinon la capacité est `False`
+et l'enrôlement est refusé explicitement.

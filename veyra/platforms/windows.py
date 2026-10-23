@@ -1,40 +1,66 @@
 # veyra/platforms/windows.py
-"""Adaptateur Windows — INTERFACE FOURNIE, NON OPÉRATIONNELLE EN V0.1.
+"""Adaptateur Windows — verrouillage et coffre clés réels (V0.2).
 
-Les fonctions marquées indisponibles apparaissent comme telles dans la GUI.
-Aucune simulation silencieuse n'est effectuée.
+Verrouillage : ``LockWorkStation`` (user32.dll, aucun droit admin requis).
+Activity : pynput non testé sur Windows -> capacité exposée ``False``
+(honnête, pas de fallback simulé).
+Coffre clés : DPAPI utilisateur via ``storage.biometrics`` (voir ce module).
 """
 
 from __future__ import annotations
 
+import ctypes
+import logging
+import sys
 
 from veyra.platforms.base import PlatformAdapter, PlatformCapabilities
+
+logger = logging.getLogger(__name__)
 
 
 class WindowsAdapter(PlatformAdapter):
     platform_id = "windows"
-    display_name = "Windows (prévisionnel)"
+    display_name = "Windows"
 
     def capabilities(self) -> PlatformCapabilities:
+        notes: dict[str, str] = {}
+        if not sys.platform.startswith("win"):
+            notes["status"] = (
+                "Adaptateur Windows chargé hors Windows : "
+                "verrouillage et coffre clés indisponibles."
+            )
+            return PlatformCapabilities(
+                session_lock=False,
+                activity_monitoring=False,
+                secure_key_storage=False,
+                notes=notes,
+            )
+        notes["activity_monitoring"] = (
+            "Flux d'activité non testé sur Windows (V0.2)."
+        )
         return PlatformCapabilities(
-            session_lock=False,  # V0.1 : non implémenté (LockWorkStation non branché)
-            activity_monitoring=False,  # V0.1 : non testé sur Windows
-            secure_key_storage=False,  # V0.1 : DPAPI non branché
+            session_lock=True,
+            activity_monitoring=False,
+            secure_key_storage=True,
             tray_icon=True,
-            notes={
-                "status": "Adaptateur prévisionnel. Aucune fonction opérationnelle en V0.1.",
-                "session_lock": "Verrouillage non implémenté (V0.1).",
-                "activity_monitoring": "Flux d'activité non implémenté (V0.1).",
-                "secure_key_storage": "Coffre de clés non implémenté : enrôlement biométrique désactivé.",
-            },
+            notes=notes,
         )
 
     def lock_session(self) -> bool:
-        # Volontairement non implémenté : voir capabilities().
-        raise NotImplementedError(
-            "Verrouillage Windows non implémenté en V0.1. "
-            "Le coupe-circuit bloque toute tentative en mode PROTECTION."
-        )
+        if not sys.platform.startswith("win"):
+            logger.error("lock_session appelé hors Windows.")
+            return False
+        try:
+            # LockWorkStation ne renvoie pas d'erreur détaillée : un retour
+            # non nul indique seulement que la demande a été acceptée.
+            ok = bool(ctypes.windll.user32.LockWorkStation())
+        except (OSError, AttributeError):
+            logger.exception("Échec de l'appel à LockWorkStation.")
+            return False
+        if not ok:
+            logger.error("Verrouillage Windows refusé (LockWorkStation = 0).")
+            return False
+        return True
 
     def create_activity_stream(self):
         return None

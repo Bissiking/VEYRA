@@ -1,4 +1,4 @@
-# ARCHITECTURE — VEYRA V0.1
+# ARCHITECTURE — VEYRA V0.2
 
 Vue d'ensemble des composants, des flux de données et des règles d'interaction.
 
@@ -24,14 +24,15 @@ veyra/                      # paquet Python
     module_api.py           # IVeyraModule, ModuleInfo, ModuleState
     module_manager.py       # registre, démarrage/arrêt, publication de statuts
   modules/
-    face_guard/             # caméra, pipeline YuNet+SFace, enrôlement, profils
+    face_guard/             # caméra, pipeline YuNet+SFace, liveness, calibration, enrôlement, profils
     activity_guard/         # flux pynput (horodatages seulement)
     session_guard/          # relais décision -> exécuteur (aucun accès plateforme)
   platforms/
     base.py                 # PlatformAdapter, PlatformCapabilities
-    macos.py                # implémentée (verrouillage osascript, keychain)
-    windows.py              # interface prévisionnelle NON opérationnelle (V0.1)
-    linux.py                # interface prévisionnelle NON opérationnelle (V0.1)
+    macos.py                # verrouillage osascript, Keychain
+    windows.py              # LockWorkStation, DPAPI
+    linux.py                # loginctl, Secret Service (secret-tool)
+    autostart.py            # démarrage au login (LaunchAgent / HKCU Run / .desktop)
     factory.py              # sélection selon sys.platform
   storage/
     database.py             # SQLite (settings, events, profiles)

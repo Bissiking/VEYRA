@@ -13,10 +13,19 @@ import logging
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QCloseEvent
-from PySide6.QtWidgets import (QApplication, QButtonGroup, QHBoxLayout, QLabel,
-                               QMainWindow, QMessageBox, QPushButton,
-                               QStackedWidget, QSystemTrayIcon, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (
+    QApplication,
+    QButtonGroup,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QStackedWidget,
+    QSystemTrayIcon,
+    QVBoxLayout,
+    QWidget,
+)
 
 from veyra.gui import theme
 from veyra.gui.bridge import GuiBridge
@@ -213,7 +222,7 @@ class MainWindow(QMainWindow):
         if app is not None:
             app.quit()
 
-    def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802 (API Qt)
+    def closeEvent(self, event: QCloseEvent) -> None:
         if self._really_quit:
             event.accept()
             return

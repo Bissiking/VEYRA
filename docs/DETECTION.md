@@ -1,4 +1,4 @@
-# DÉTECTION — VEYRA V0.1
+# DÉTECTION — VEYRA V0.2
 
 Reconnaissance faciale, surveillance adaptative et moteur de décision.
 
@@ -8,13 +8,14 @@ Reconnaissance faciale, surveillance adaptative et moteur de décision.
 
 ```
 frame BGR (CameraWorker, ~10 fps)
-   → YuNet (cv2.FaceDetectorYN, score ≥ 0.6, NMS 0.3)      [détection]
+   → YuNet (cv2.FaceDetectorYN, score ≥ 0.6, NMS 0.3)      [détection + landmarks]
    → alignement SFace (cv2.FaceRecognizerSF.alignCrop)      [5 points]
    → prétraitement (x-127.5)/127.5, NCHW
    → SFace ONNX Runtime (1,3,112,112) → vecteur 128-D       [empreinte]
    → L2-normalisation
    → distance L2 vs empreinte de référence du profil
    → classification par visage → agrégation multi-visages
+   → liveness (blink + texture) → dégradation si spoof suspect
 ```
 
 Modèles locaux (`scripts/download_models.py`, URL épinglées + SHA-256) :
@@ -34,6 +35,30 @@ Qualité (`SecurityPolicy`) : `min_face_brightness=40` (moyenne du ROI en gris),
 `min_face_size_px=80`. Conditions non remplies → `UNDETERMINED` (jamais
 `TRUSTED`, jamais interprété comme une intrusion).
 
+### Anti-spoofing (`veyra/modules/face_guard/liveness.py`)
+
+Le `LivenessTracker` reçoit, pour chaque analyse, l'ouverture des yeux et le
+score de texture du meilleur visage. Fenêtre glissante (défaut 8 s) :
+
+- **Blink** : ouverture yeux open → closed → open dans la fenêtre.
+- **Texture** : variance du Laplacien sur le ROI visage (indicatif plan vs
+  peau).
+- **Suspicion** : assez de données **ET** blinks < `liveness_min_blinks` **ET**
+  texture < `liveness_min_texture` — les deux signaux doivent être bas
+  (un seul signal n'élève pas de suspicion).
+- **Effet** : un visage `TRUSTED` mais suspect est publié en `UNKNOWN`.
+  Jamais de verrouillage immédiat, jamais d'`ERROR`.
+
+Les heuristiques sont documentées dans `SECURITY.md` (limites résiduelles).
+
+### Calibration locale (`veyra/modules/face_guard/calibration.py`)
+
+- Les distances L2 des échantillons d'enrôlement (genuine) et des visages
+  `UNKNOWN` observés (impostor) sont collectés **localement**.
+- `far_frr_curve` construit la courbe ; `equal_error_point` trouve le seuil
+  EER. Appliqué via les Réglages → seuil de reconnaissance ajusté.
+- Aucune image ni empreinte ne quitte l'appareil.
+
 ### Multi-visages
 
 Agrégation (`_aggregate`) : si **au moins un** visage est `TRUSTED` → `TRUSTED`
@@ -42,7 +67,7 @@ sinon `UNDETERMINED`.
 
 ### Enrôlement (page Présence)
 
-1. Un seul profil autorisé en V0.1 (`user_key="owner"`), architecture
+1. Un seul profil autorisé (`user_key="owner"`), architecture
    multi-profils déjà en place (table `profiles`, `user_key` unique).
 2. Récolte de `enrollment_samples` (8) échantillons, **un seul visage** exigé,
    cadence 0,25 s, timeout 3 min.
